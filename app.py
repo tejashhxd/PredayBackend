@@ -4,12 +4,16 @@ import hashlib
 import os
 from functools import wraps
 from dotenv import load_dotenv
+from flask_cors import CORS
 
 load_dotenv()
 
 API_TOKEN = os.getenv("API_TOKEN")
+FRONTEND_URL = os.getenv("FRONTEND_URL")
 
 app = Flask(__name__)
+
+CORS(app, origins=[FRONTEND_URL])
 
 def require_token(f):
     @wraps(f)
@@ -35,7 +39,7 @@ def innit_db():
     conn.execute("""
                  CREATE TABLE IF NOT EXISTS users(
                      id INTEGER PRIMARY KEY AUTOINCREMENT,
-                     username TEXT UNQIUE NOT NULL,
+                     username TEXT UNIQUE NOT NULL,
                      password TEXT NOT NULL
                  )
                  """)
@@ -148,7 +152,9 @@ def delete_task(username, password, id):
            conn.close()
            return jsonify({"error": "User not found"}), 400
 
-if __name__ == "__main__":
-    with app.app_context():
+with app.app_context():
         innit_db()
+
+if __name__ == "__main__":
+    
     app.run(debug=True);
