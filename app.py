@@ -104,28 +104,29 @@ def login():
         return jsonify({"error": "user not found"})
     
     
-@app.route("/user/<string:username>/<string:password>/task", methods=["GET"])
-def get_task(username, password):
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+@app.route("/task", methods=["GET"])
+def get_task():
+    data = request.get_json()
+    username = data.get("username")
     conn = connect_to_db()
-    rows = conn.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, hashed_password)).fetchone()
+    rows = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     if rows:
         task_row = conn.execute(f"SELECT * FROM {username}_tasks").fetchall()
         conn.close()
-        return jsonify([dict(row) for row in task_row]), 201
+        return jsonify([dict(row) for row in task_row]), 200
     else:
         conn.close()
         return jsonify({"error": "User not found"}), 400
     
     
-@app.route("/user/<string:username>/<string:password>/task", methods=["POST"])
-def post_task(username, password):
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+@app.route("/task", methods=["POST"])
+def post_task():
+    data = request.get_json()
+    username = data.get("username")
+    task = data.get("task")
     conn = connect_to_db()
-    rows = conn.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, hashed_password)).fetchone()
+    rows = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     if rows:
-       data = request.get_json()
-       task = data.get("task")
        conn.execute(f"INSERT INTO {username}_tasks (task) VALUES (?)", (task,))
        conn.commit()
        conn.close()
@@ -134,17 +135,19 @@ def post_task(username, password):
        conn.close()
        return jsonify({"error": "User not found"}), 400
    
-@app.route("/user/<string:username>/<string:password>/task/<int:id>", methods=["DELETE"])
-def delete_task(username, password, id):
-        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+@app.route("/task", methods=["DELETE"])
+def delete_task():
+        data = request.get_json()
+        username = data.get("username")
+        id = data.get("id")
         conn = connect_to_db()
-        rows = conn.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, hashed_password)).fetchone()
+        rows = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         if rows:
            if(conn.execute(f"SELECT * FROM {username}_tasks WHERE id=?", (id,)).fetchone()):
                conn.execute(f"DELETE FROM {username}_tasks WHERE id=?", (id,))
                conn.commit()
                conn.close()
-               return jsonify({"message": "task deleted successfully"}), 201
+               return jsonify({"message": "task deleted successfully"}), 200
            else:
                return jsonify({"error": "id not found"}), 400
            
