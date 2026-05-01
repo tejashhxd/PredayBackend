@@ -106,8 +106,7 @@ def login():
     
 @app.route("/task", methods=["GET"])
 def get_task():
-    data = request.get_json()
-    username = data.get("username")
+    username = request.args.get("username")
     conn = connect_to_db()
     rows = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
     if rows:
