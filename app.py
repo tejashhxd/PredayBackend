@@ -65,15 +65,16 @@ def register():
     try:
         conn = connect_to_db()
         conn.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
-        conn.commit()
         conn.execute(f"""CREATE TABLE IF NOT EXISTS {username}_tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
             task TEXT NOT NULL
             )""")
-        conn.close()
+        conn.commit()
         return jsonify({"message": "user created successfully"}), 201
     except sqlite3.IntegrityError:
         return jsonify({"error": "Username already exist"}), 400
+    finally:
+        conn.close()
     
 
 @app.route("/users", methods=["GET"])
@@ -95,13 +96,15 @@ def login():
     
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     conn = connect_to_db()
-    user = conn.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, hashed_password)).fetchone()
-    conn.close()
+    try:
+        user = conn.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, hashed_password)).fetchone()
+    finally:
+        conn.close()
     
     if user:
-        return jsonify({"message": f"Welcome {username}"})
+        return jsonify({"message": f"Welcome {username}"}), 200
     else:
-        return jsonify({"error": "user not found"})
+        return jsonify({"error": "user not found"}), 401
     
     
 @app.route("/task", methods=["GET"])
@@ -124,15 +127,18 @@ def post_task():
     username = data.get("username")
     task = data.get("task")
     conn = connect_to_db()
-    rows = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-    if rows:
-       conn.execute(f"INSERT INTO {username}_tasks (task) VALUES (?)", (task,))
-       conn.commit()
-       conn.close()
-       return jsonify({"message": "task added successfully"}), 201
-    else:
-       conn.close()
-       return jsonify({"error": "User not found"}), 400
+    try:
+        rows = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        if rows:
+            conn.execute(f"INSERT INTO {username}_tasks (task) VALUES (?)", (task,))
+            conn.commit()
+            return jsonify({"message": "task added successfully"}), 201
+        else:
+            return jsonify({"error": "User not found"}), 400
+        
+    finally:
+        conn.close()
+    
    
 @app.route("/task", methods=["DELETE"])
 def delete_task():
