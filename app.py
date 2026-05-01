@@ -102,9 +102,9 @@ def login():
         conn.close()
     
     if user:
-        return jsonify({"message": f"Welcome {username}"}), 200
+        return jsonify({"message": f"Welcome {username}"})
     else:
-        return jsonify({"error": "user not found"}), 401
+        return jsonify({"error": "user not found"})
     
     
 @app.route("/task", methods=["GET"])
