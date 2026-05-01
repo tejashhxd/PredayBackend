@@ -9,7 +9,12 @@ from flask_cors import CORS
 load_dotenv()
 
 API_TOKEN = os.getenv("API_TOKEN")
-FRONTEND_URL = os.getenv("FRONTEND_URL")
+
+FRONTEND_URL = [
+    url.strip()
+    for url in os.getenv("FRONTEND_URL", "").split(",")
+    if url.strip()
+]
 
 app = Flask(__name__)
 
