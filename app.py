@@ -10,7 +10,7 @@ load_dotenv()
 
 API_TOKEN = os.getenv("API_TOKEN")
 
-FRONTEND_URL = [
+FRONTEND_URLS = [
     url.strip()
     for url in os.getenv("FRONTEND_URL", "").split(",")
     if url.strip()
@@ -18,7 +18,7 @@ FRONTEND_URL = [
 
 app = Flask(__name__)
 
-CORS(app, origins=[FRONTEND_URL])
+CORS(app, origins=FRONTEND_URLS)
 
 def require_token(f):
     @wraps(f)
