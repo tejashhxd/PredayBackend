@@ -72,7 +72,9 @@ def register():
         conn.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
         conn.execute(f"""CREATE TABLE IF NOT EXISTS {username}_tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            task TEXT NOT NULL
+            task TEXT NOT NULL,
+            description TEXT, 
+            date DATE
             )""")
         conn.commit()
         return jsonify({"message": "user created successfully"}), 201
@@ -131,11 +133,13 @@ def post_task():
     data = request.get_json()
     username = data.get("username")
     task = data.get("task")
+    description = data.get("description")
+    date = data.get("date")
     conn = connect_to_db()
     try:
         rows = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
         if rows:
-            conn.execute(f"INSERT INTO {username}_tasks (task) VALUES (?)", (task,))
+            conn.execute(f"INSERT INTO {username}_tasks (task, description, date) VALUES (?, ?, ?)", (task,description,date))
             conn.commit()
             return jsonify({"message": "task added successfully"}), 201
         else:
@@ -164,6 +168,24 @@ def delete_task():
         else:
            conn.close()
            return jsonify({"error": "User not found"}), 400
+       
+@app.route("/task", methods=["PUT"])
+def edit_task():
+    data = request.get_json()
+    task = data.get("task")
+    description = data.get("description")
+    date = data.get("date")
+    username = data.get("username")
+    id = data.get("id")
+    conn = connect_to_db()
+    try:
+        conn.execute(f"UPDATE {username}_tasks SET task=?, description=?, date=? WHERE id=?", (task, description, date, id))
+        conn.commit()
+        conn.close()
+        return jsonify({"message": "task edited succesfully"}), 201
+    finally:
+        conn.close()
+        
 
 with app.app_context():
         innit_db()
