@@ -97,17 +97,16 @@ def login():
     
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     
-    try:
-        user = User.query.filter_by(
-            username=username,
-            password=hashed_password
-        ).first()
+    user = User.query.filter_by(
+        username=username,
+        password=hashed_password
+    ).first()
         
-    finally:
-        if user:
-            return jsonify({"message": f"Welcome {username}"}), 200
-        else:
-            return jsonify({"error": "user not found"}), 401
+    
+    if user:
+        return jsonify({"message": f"Welcome {username}"}), 200
+    else:
+        return jsonify({"error": "user not found"}), 401
     
     
 @app.route("/task", methods=["GET"])
