@@ -1,5 +1,7 @@
 from flask import Flask, jsonify, request
-import sqlite3
+from flask_sqlalchemy import SQLAlchemy
+from models import db, User, Task
+from datetime import datetime
 import hashlib
 import os
 from functools import wraps
@@ -18,6 +20,11 @@ FRONTEND_URLS = [
 
 app = Flask(__name__)
 
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///preday.db"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db.init_app(app);
+
 CORS(app, origins=FRONTEND_URLS)
 
 def require_token(f):
@@ -32,24 +39,10 @@ def require_token(f):
     
     return decorated_function
 
-def connect_to_db():
-    conn = sqlite3.connect("preday.db")
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 @app.route("/innit")
 def innit_db():
-    conn = connect_to_db()
-    conn.execute("""
-                 CREATE TABLE IF NOT EXISTS users(
-                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                     username TEXT UNIQUE NOT NULL,
-                     password TEXT NOT NULL
-                 )
-                 """)
-    conn.commit()
-    conn.close()
     return jsonify({"message": "database intialized successfully"}), 201
 
 @app.route("/")
@@ -68,29 +61,30 @@ def register():
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     
     try:
-        conn = connect_to_db()
-        conn.execute("INSERT INTO users (username, password) VALUES (?, ?)", (username, hashed_password))
-        conn.execute(f"""CREATE TABLE IF NOT EXISTS {username}_tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            task TEXT NOT NULL,
-            description TEXT, 
-            date DATE
-            )""")
-        conn.commit()
+        user = User(
+            username=username,
+            password=hashed_password
+        )
+        db.session.add(user)
+        db.session.commit()
+        
         return jsonify({"message": "user created successfully"}), 201
-    except sqlite3.IntegrityError:
+    except Exception:
+        db.session.rollback()
         return jsonify({"error": "Username already exist"}), 400
-    finally:
-        conn.close()
     
 
 @app.route("/users", methods=["GET"])
 @require_token
 def users():
-    conn = connect_to_db()
-    rows = conn.execute("SELECT * FROM users").fetchall()
-    conn.close()
-    return jsonify([dict(row) for row in rows])
+    users = User.query.all()
+    return jsonify([
+        {
+            "id": user.id,
+            "username": user.username
+        }
+        for user in users
+    ])
 
 
 @app.route("/login", methods=["POST"])
@@ -102,94 +96,125 @@ def login():
         return jsonify({"error": "enter valif info"}), 400
     
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    conn = connect_to_db()
-    try:
-        user = conn.execute("SELECT * FROM users WHERE username = ? AND password = ?", (username, hashed_password)).fetchone()
-    finally:
-        conn.close()
     
-    if user:
-        return jsonify({"message": f"Welcome {username}"})
-    else:
-        return jsonify({"error": "user not found"})
+    try:
+        user = User.query.filter_by(
+            username=username,
+            password=hashed_password
+        ).first()
+        
+    finally:
+        if user:
+            return jsonify({"message": f"Welcome {username}"}), 200
+        else:
+            return jsonify({"error": "user not found"}), 401
     
     
 @app.route("/task", methods=["GET"])
 def get_task():
     username = request.args.get("username")
-    conn = connect_to_db()
-    rows = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-    if rows:
-        task_row = conn.execute(f"SELECT * FROM {username}_tasks").fetchall()
-        conn.close()
-        return jsonify([dict(row) for row in task_row]), 200
-    else:
-        conn.close()
+    user = User.query.filter_by(username=username).first()
+    if not user:
         return jsonify({"error": "User not found"}), 400
+    return jsonify([
+        {
+            "id": task.id,
+            "task":task.task,
+            "description": task.description,
+            "date": task.date.isoformat() if task.date else None
+        }
+        for task in user.tasks
+    ]), 200
     
     
 @app.route("/task", methods=["POST"])
 def post_task():
     data = request.get_json()
     username = data.get("username")
-    task = data.get("task")
+    task_name = data.get("task")
     description = data.get("description")
     date = data.get("date")
-    conn = connect_to_db()
-    try:
-        rows = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-        if rows:
-            conn.execute(f"INSERT INTO {username}_tasks (task, description, date) VALUES (?, ?, ?)", (task,description,date))
-            conn.commit()
-            return jsonify({"message": "task added successfully"}), 201
-        else:
-            return jsonify({"error": "User not found"}), 400
-        
-    finally:
-        conn.close()
+    
+    user = User.query.filter_by(username=username).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 400
+    
+    if date:
+        date = datetime.strptime(date, "%Y-%m-%d").date()
+    
+    new_task = Task(
+        task=task_name,
+        description=description,
+        date=date,
+        user=user
+    )
+    
+    db.session.add(new_task)
+    db.session.commit()
+    
+    return jsonify({"message": "task added successfully"}), 201
     
    
 @app.route("/task", methods=["DELETE"])
 def delete_task():
-        data = request.get_json()
-        username = data.get("username")
-        id = data.get("id")
-        conn = connect_to_db()
-        rows = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-        if rows:
-           if(conn.execute(f"SELECT * FROM {username}_tasks WHERE id=?", (id,)).fetchone()):
-               conn.execute(f"DELETE FROM {username}_tasks WHERE id=?", (id,))
-               conn.commit()
-               conn.close()
-               return jsonify({"message": "task deleted successfully"}), 200
-           else:
-               return jsonify({"error": "id not found"}), 400
-           
-        else:
-           conn.close()
-           return jsonify({"error": "User not found"}), 400
+    data = request.get_json()
+    username = data.get("username")
+    id = data.get("id")
+        
+    user = User.query.filter_by(username=username).first()
+    
+    if not user:
+        return jsonify({"error": "user not found"}), 400
+    
+    task =  Task.query.filter_by(
+        id=id,
+        user_id=user.id
+    ).first()
+    
+    if not task:
+        return jsonify({"error": "id not found"}), 400
+    
+    db.session.delete(task);
+    db.session.commit()
+    
+    return jsonify({
+        "message": "task deleted successfully"
+    }), 200
+        
        
 @app.route("/task", methods=["PUT"])
 def edit_task():
     data = request.get_json()
-    task = data.get("task")
-    description = data.get("description")
-    date = data.get("date")
     username = data.get("username")
     id = data.get("id")
-    conn = connect_to_db()
-    try:
-        conn.execute(f"UPDATE {username}_tasks SET task=?, description=?, date=? WHERE id=?", (task, description, date, id))
-        conn.commit()
-        conn.close()
-        return jsonify({"message": "task edited succesfully"}), 201
-    finally:
-        conn.close()
-        
+    user = User.query.filter_by(
+        username=username
+    ).first()
+    
+    if not user:
+        return jsonify({"error": "user not found"}), 400
+    
+    task = Task.query.filter_by(
+        id=id,
+        user_id=user.id
+    ).first()
+    
+    if not task:
+        return jsonify({"error": "task not found"}), 404
+    
+    task.task = data.get("task")
+    task.description = data.get("description")
+    task.date = data.get("date")
+    
+    db.session.commit()
+    
+    return jsonify({
+        "message": "task edited successfully"
+    }), 200
+    
 
 with app.app_context():
-        innit_db()
+        db.create_all()
 
 if __name__ == "__main__":
-    
     app.run(debug=True);
