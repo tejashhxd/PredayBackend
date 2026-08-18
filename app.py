@@ -93,7 +93,7 @@ def login():
     username = data.get("username")
     password = data.get("password")
     if not username or not password:
-        return jsonify({"error": "enter valif info"}), 400
+        return jsonify({"error": "enter valid info"}), 400
     
     hashed_password = hashlib.sha256(password.encode()).hexdigest()
     
@@ -203,7 +203,7 @@ def edit_task():
     
     task.task = data.get("task")
     task.description = data.get("description")
-    task.date = data.get("date")
+    task.date = datetime.strptime(data.get("date"), "%Y-%m-%d").date()
     
     db.session.commit()
     
