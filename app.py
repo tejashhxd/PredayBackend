@@ -7,6 +7,7 @@ import os
 from functools import wraps
 from dotenv import load_dotenv
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, set_access_cookies, unset_jwt_cookies
 
 load_dotenv()
 
@@ -22,10 +23,21 @@ app = Flask(__name__)
 
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///preday.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+app.config["JWT_TOKEN_LOCATION"] = ["Cookies"]
+app.config["JWT_COKKIE_SECURE"] = False #false for localSite and True for deployement
+app.config["JWT_COOKIE_HTTPONLY"] = False #false for localSite and True for deployement
+app.config["JWT_COOKIE_SAMESITE"] = "none"
+
+jwt = JWTManager(app)
 
 db.init_app(app);
 
-CORS(app, origins=FRONTEND_URLS)
+CORS(
+    app,
+    supports_credentials=True,
+    origins=FRONTEND_URLS
+)
 
 def require_token(f):
     @wraps(f)
@@ -101,20 +113,64 @@ def login():
         username=username,
         password=hashed_password
     ).first()
-        
     
     if user:
-        return jsonify({"message": f"Welcome {username}"}), 200
+        if user.password != hashed_password:
+            return jsonify({"error": "invalid username or password"}), 401
+        
+        access_token = create_access_token(
+            identity=str(user.id)
+        )
+        
+        response = jsonify({
+            "message": "Login successful"
+        })
+        
+        set_access_cookies(response, access_token)
+        
+        return response, 200
+    
     else:
         return jsonify({"error": "user not found"}), 401
     
     
+
+@app.route("/logout", methods=["POST"])
+@jwt_required()
+def logout():
+    response = jsonify({
+        "message": "Logged out successfully"
+    })
+    
+    unset_jwt_cookies(response)
+    
+    return response, 200
+
+
+@app.route("/me", methods=["GET"])
+@jwt_required()
+def me():
+    user_id = get_jwt_identity()
+    
+    user = User.query.get(user_id)
+    
+    return jsonify({
+        "id": user.id,
+        "username": user.username
+    }), 200
+    
+    
+    
 @app.route("/task", methods=["GET"])
+@jwt_required()
 def get_task():
-    username = request.args.get("username")
-    user = User.query.filter_by(username=username).first()
+    user_id = get_jwt_identity()
+    
+    user = User.query.filter_by(id=user_id).first()
+    
     if not user:
         return jsonify({"error": "User not found"}), 400
+    
     return jsonify([
         {
             "id": task.id,
@@ -127,14 +183,15 @@ def get_task():
     
     
 @app.route("/task", methods=["POST"])
+@jwt_required()
 def post_task():
     data = request.get_json()
-    username = data.get("username")
+    user_id = get_jwt_identity()
     task_name = data.get("task")
     description = data.get("description")
     date = data.get("date")
     
-    user = User.query.filter_by(username=username).first()
+    user = User.query.filter_by(id=user_id).first()
     if not user:
         return jsonify({"error": "User not found"}), 400
     
@@ -155,12 +212,13 @@ def post_task():
     
    
 @app.route("/task", methods=["DELETE"])
+@jwt_required()
 def delete_task():
     data = request.get_json()
-    username = data.get("username")
+    user_id = get_jwt_identity()
     id = data.get("id")
         
-    user = User.query.filter_by(username=username).first()
+    user = User.query.filter_by(id=user_id).first()
     
     if not user:
         return jsonify({"error": "user not found"}), 400
@@ -182,12 +240,13 @@ def delete_task():
         
        
 @app.route("/task", methods=["PUT"])
+@jwt_required()
 def edit_task():
     data = request.get_json()
-    username = data.get("username")
+    user_id = get_jwt_identity()
     id = data.get("id")
     user = User.query.filter_by(
-        username=username
+        id=user_id
     ).first()
     
     if not user:
