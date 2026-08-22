@@ -25,7 +25,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///preday.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
-app.config["JWT_COKKIE_SECURE"] = False #false for localSite and True for deployement
+app.config["JWT_COKKIE_SECURE"] = True #false for localSite and True for deployement
 app.config["JWT_COOKIE_HTTPONLY"] = False #false for localSite and True for deployement
 app.config["JWT_COOKIE_SAMESITE"] = "none"
 
