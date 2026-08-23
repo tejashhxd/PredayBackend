@@ -162,6 +162,9 @@ def me():
     
     user = User.query.get(user_id)
     
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
     return jsonify({
         "id": user.id,
         "username": user.username
@@ -169,7 +172,7 @@ def me():
     
     
 @app.route("/csrf", methods=["GET"])
-@jwt_required
+@jwt_required()
 def csrf():
     return jsonify({
         "csrf_token": get_jwt()["csrf"]
