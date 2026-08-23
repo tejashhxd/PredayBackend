@@ -7,7 +7,14 @@ import os
 from functools import wraps
 from dotenv import load_dotenv
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, set_access_cookies, unset_jwt_cookies
+from flask_jwt_extended import (
+    JWTManager, 
+    create_access_token, 
+    jwt_required, 
+    get_jwt_identity, 
+    set_access_cookies, 
+    unset_jwt_cookies, 
+    get_jwt)
 
 load_dotenv()
 
@@ -26,8 +33,9 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
 app.config["JWT_COOKIE_SECURE"] = True #false for localSite and True for deployement
-app.config["JWT_COOKIE_HTTPONLY"] = False #false for localSite and True for deployement
+app.config["JWT_COOKIE_HTTPONLY"] = True #false for localSite and True for deployement
 app.config["JWT_COOKIE_SAMESITE"] = "none"
+app.config["JWT_COOKIE_CSRF_PROTECT"] = True
 
 jwt = JWTManager(app)
 
@@ -157,6 +165,14 @@ def me():
     return jsonify({
         "id": user.id,
         "username": user.username
+    }), 200
+    
+    
+@app.route("/crsf", methods=["GET"])
+@jwt_required
+def csrf():
+    return jsonify({
+        "csrf_token": get_jwt()["csrf"]
     }), 200
     
     
