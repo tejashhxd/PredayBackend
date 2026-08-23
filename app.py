@@ -168,7 +168,7 @@ def me():
     }), 200
     
     
-@app.route("/crsf", methods=["GET"])
+@app.route("/csrf", methods=["GET"])
 @jwt_required
 def csrf():
     return jsonify({
