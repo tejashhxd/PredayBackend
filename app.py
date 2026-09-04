@@ -195,6 +195,7 @@ def get_task():
             "id": task.id,
             "task":task.task,
             "description": task.description,
+            "category": task.category,
             "date": task.date.isoformat() if task.date else None
         }
         for task in user.tasks
@@ -208,6 +209,7 @@ def post_task():
     user_id = get_jwt_identity()
     task_name = data.get("task")
     description = data.get("description")
+    category = data.get("category")
     date = data.get("date")
     
     user = User.query.filter_by(id=user_id).first()
@@ -221,6 +223,7 @@ def post_task():
         task=task_name,
         description=description,
         date=date,
+        category=category,
         user=user
     )
     

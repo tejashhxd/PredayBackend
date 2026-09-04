@@ -42,6 +42,12 @@ class Task(db.Model):
         db.Date
     )
     
+    category = db.Column(
+        db.String(100),
+        nullable=False,
+        default="Tasks"
+    )
+    
     user_id = db.Column(
         db.Integer,
         db.ForeignKey("users.id"),
