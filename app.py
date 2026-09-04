@@ -253,7 +253,7 @@ def delete_task():
     if not task:
         return jsonify({"error": "id not found"}), 400
     
-    db.session.delete(task);
+    db.session.delete(task)
     db.session.commit()
     
     return jsonify({
@@ -292,6 +292,43 @@ def edit_task():
         "message": "task edited successfully"
     }), 200
     
+@app.route("/category", methods=["DELETE"])
+@jwt_required()
+def delete_category():
+    data = request.get_json()
+    user_id = get_jwt_identity()
+    category = data.get("category")
+    
+    if category == "Tasks":
+        return jsonify({
+            "error": "default Tasks cannot be deleted"
+        }), 400
+    
+    user = User.query.filter_by(
+        id = user_id
+    ).first()
+    
+    if not user:
+        return jsonify({"error": "User Not Found"}), 401
+    
+    tasks = Task.query.filter_by(
+        user_id = user_id,
+        category = category
+    ).all()
+    
+    if not tasks:
+        return jsonify({
+            "error": "category not found"
+        }), 404
+    
+    for task in tasks:
+        db.session.delete(task)
+    
+    db.session.commit()
+    
+    return jsonify({
+        "message": "Category deleted successfully"
+    }), 200    
 
 with app.app_context():
         db.create_all()
